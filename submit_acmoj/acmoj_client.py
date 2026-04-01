@@ -95,6 +95,13 @@ class ACMOJClient:
 
         return result
 
+    def submit_cpp_code(self, problem_id: int, code_text: str) -> Optional[Dict]:
+        data = {"language": "cpp", "code": code_text}
+        result = self._make_request("POST", f"/problem/{problem_id}/submit", data=data)
+        if result and 'id' in result:
+            self._save_submission_id(result['id'])
+        return result
+
     def get_submission_detail(self, submission_id: int) -> Optional[Dict]:
         return self._make_request("GET", f"/submission/{submission_id}")
 
@@ -114,6 +121,12 @@ def main():
     submit_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
     submit_parser.add_argument("--git-url", type=str, required=True, help="Git repository URL")
 
+    # C++ code submission sub-command
+    submit_cpp_parser = subparsers.add_parser("submit-cpp", help="Submit C++ code text/file")
+    submit_cpp_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
+    submit_cpp_parser.add_argument("--code-file", type=str, required=False, help="Path to code file (e.g., src.hpp)")
+    submit_cpp_parser.add_argument("--code-text", type=str, required=False, help="Inline code text (if not using file)")
+
     # Sub-command for checking submission status
     status_parser = subparsers.add_parser("status", help="Check submission status")
     status_parser.add_argument("--submission-id", type=int, required=True, help="Submission ID")
@@ -132,6 +145,21 @@ def main():
 
     if args.command == "submit":
         result = client.submit_git(args.problem_id, args.git_url)
+    elif args.command == "submit-cpp":
+        code_text = None
+        if getattr(args, 'code_text', None):
+            code_text = args.code_text
+        elif getattr(args, 'code_file', None):
+            try:
+                with open(args.code_file, 'r', encoding='utf-8') as f:
+                    code_text = f.read()
+            except Exception as e:
+                print(f"Failed to read code file: {e}")
+                return
+        else:
+            print("Error: provide --code-file or --code-text")
+            return
+        result = client.submit_cpp_code(args.problem_id, code_text)
     elif args.command == "status":
         result = client.get_submission_detail(args.submission_id)
     elif args.command == "abort":
